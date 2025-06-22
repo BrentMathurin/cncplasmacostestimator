@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CNC Plasma Cutting Cost Estimator</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 24px auto; background: #f8f8f8; padding: 20px; }
+    .form-group { margin-bottom: 16px; }
+    label { font-weight: bold; display: block; }
+    input, select { width: 100%; padding: 6px; box-sizing: border-box; }
+    .results { background: #eef; border: 1px solid #aaf; padding: 16px; margin-top: 18px; }
+    .files { margin-bottom: 16px; }
+    .files span { font-size: 0.95em; margin-left: 8px; }
+    .btn { padding: 8px 20px; background: #0c6; border: none; color: #fff; border-radius: 4px; cursor: pointer; }
+    .btn:active { background: #095; }
+  </style>
+</head>
+<body>
+  <h2>CNC Plasma Cutting Cost Estimator</h2>
+  <form id="estimatorForm">
+    <div class="form-group files">
+      <label for="fileInput">Upload Drawing (optional):</label>
+      <input type="file" id="fileInput" accept=".dxf,.svg,.dwg,.pdf,.jpg,.png"/>
+      <span id="fileName"></span>
+    </div>
+    <div class="form-group">
+      <label for="material">Material Type:</label>
+      <select id="material" required>
+        <option value="Steel">Steel</option>
+        <option value="Stainless Steel">Stainless Steel</option>
+        <option value="Aluminum">Aluminum</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="thickness">Material Thickness (mm):</label>
+      <input type="number" id="thickness" min="0.5" step="0.1" value="3" required>
+    </div>
+    <div class="form-group">
+      <label for="dimensions">Part Dimensions (mm, L x W):</label>
+      <input type="text" id="dimensions" placeholder="e.g. 100x200" required>
+    </div>
+    <div class="form-group">
+      <label for="quantity">Quantity:</label>
+      <input type="number" id="quantity" min="1" value="1" required>
+    </div>
+    <div class="form-group">
+      <label for="cutLength">Estimated Cut Length per Part (mm):</label>
+      <input type="number" id="cutLength" min="1" value="500" required>
+    </div>
+    <div class="form-group">
+      <label for="materialCost">Material Cost per kg ($):</label>
+      <input type="number" id="materialCost" min="0.1" step="0.01" value="2.50" required>
+    </div>
+    <div class="form-group">
+      <label for="laborRate">Labor Rate per hour ($):</label>
+      <input type="number" id="laborRate" min="1" step="1" value="50" required>
+    </div>
+    <div class="form-group">
+      <label for="runTime">Estimated Machine Time per Part (min):</label>
+      <input type="number" id="runTime" min="0.1" step="0.1" value="2" required>
+    </div>
+    <button class="btn" type="submit">Estimate Cost</button>
+  </form>
+  <div class="results" id="results" style="display:none;"></div>
+
+  <script>
+    // Show uploaded file name
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const fileNameSpan = document.getElementById('fileName');
+      if (this.files.length) {
+        fileNameSpan.textContent = this.files[0].name;
+      } else {
+        fileNameSpan.textContent = '';
+      }
+    });
+
+    // Main estimator logic
+    document.getElementById('estimatorForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      // Gather form values
+      const material = document.getElementById('material').value;
+      const thickness = parseFloat(document.getElementById('thickness').value);
+      const dimensions = document.getElementById('dimensions').value.trim();
+      const quantity = parseInt(document.getElementById('quantity').value, 10);
+      const cutLength = parseFloat(document.getElementById('cutLength').value); // mm
+      const materialCostPerKg = parseFloat(document.getElementById('materialCost').value);
+      const laborRate = parseFloat(document.getElementById('laborRate').value);
+      const runTime = parseFloat(document.getElementById('runTime').value); // min
+
+      // Calculate area & volume (assume rectangle for prototype)
+      let area = 0, volume = 0, density = 7.85; // default density: steel (g/cm3)
+      let dims = dimensions.split('x');
+      if (dims.length === 2) {
+        let l = parseFloat(dims[0])/10; // convert mm to cm
+        let w = parseFloat(dims[1])/10;
+        let t = thickness/10;
+        area = l * w; // cm^2
+        volume = l * w * t; // cm^3
+      }
+      // Densities (g/cm3)
+      if (material === 'Stainless Steel') density = 8.0;
+      if (material === 'Aluminum') density = 2.7;
+      if (material === 'Other') density = 7.0;
+
+      // Weight in kg
+      let weight = volume * density / 1000; // (cm^3 * g/cm^3) = g / 1000 = kg
+
+      // Material cost
+      let materialCost = weight * materialCostPerKg * quantity;
+
+      // Cutting cost (per mm, example: $0.01/mm)
+      let cuttingRate = 0.01; // $ per mm, adjust as needed
+      let cuttingCost = cutLength * cuttingRate * quantity;
+
+      // Labor cost
+      let laborCost = (runTime/60) * laborRate * quantity;
+
+      // Total
+      let total = materialCost + cuttingCost + laborCost;
+
+      // Display
+      document.getElementById('results').innerHTML = `
+        <h3>Estimated Cost Breakdown</h3>
+        <ul>
+          <li><b>Material:</b> ${material} (${weight.toFixed(2)} kg/part)</li>
+          <li><b>Material Cost:</b> $${materialCost.toFixed(2)}</li>
+          <li><b>Cutting Cost:</b> $${cuttingCost.toFixed(2)}</li>
+          <li><b>Labor Cost:</b> $${laborCost.toFixed(2)}</li>
+          <li><b>Quantity:</b> ${quantity}</li>
+          <li><b>Total Cost:</b> <b style="color:green;">$${total.toFixed(2)}</b></li>
+        </ul>
+        <p><small>This is a basic estimate. For advanced features and more accurate nesting/material use, please contact us.</small></p>
+      `;
+      document.getElementById('results').style.display = 'block';
+    });
+  </script>
+</body>
+</html>
